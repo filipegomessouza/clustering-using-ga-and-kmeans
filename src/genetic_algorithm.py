@@ -4,36 +4,38 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+from src.dataset import Dataset
 
 class GeneticAlgorithm(RCGA):
     MUTATION_PROBABILITY = 0.01
 
-    def __init__(self, dataset: np.ndarray, number_of_groups: int):
+    def __init__(self, dataset: Dataset, number_of_groups: int):
         self.dataset = dataset
         self.number_of_groups = number_of_groups
-        n_features = dataset.shape[1]
+        n_features = dataset.data.shape[1]
 
         n_dimensions = number_of_groups * n_features
+        population_size = 3 * n_dimensions if n_dimensions % 2 == 0 else 3 * n_dimensions + 1
 
         super().__init__(
             func=self.fitness,
             n_dim=n_dimensions,
-            size_pop=3 * n_dimensions,
+            size_pop=population_size,
             max_iter=10 * n_dimensions,
             prob_mut=self.MUTATION_PROBABILITY,
-            lb=dataset.min(axis=0).tolist() * number_of_groups,
-            ub=dataset.max(axis=0).tolist() * number_of_groups,
+            lb=dataset.data.min(axis=0).tolist() * number_of_groups,
+            ub=dataset.data.max(axis=0).tolist() * number_of_groups,
         )
 
     def fitness(self, individual: np.ndarray) -> float:
-        centroids = individual.reshape(self.number_of_groups, self.dataset.shape[1])
-        distances: np.ndarray = np.linalg.norm(self.dataset[:, np.newaxis, :] - centroids[np.newaxis, :, :], axis=2)
+        centroids = individual.reshape(self.number_of_groups, self.dataset.data.shape[1])
+        distances: np.ndarray = np.linalg.norm(self.dataset.data[:, np.newaxis, :] - centroids[np.newaxis, :, :], axis=2)
         min_distances: np.ndarray = distances.min(axis=1)
 
         return min_distances.sum()
 
     def _apply_kmeans(self, idx: int) -> None:
-        centroids = self.X[idx].reshape(self.number_of_groups, self.dataset.shape[1])
+        centroids = self.X[idx].reshape(self.number_of_groups, self.dataset.data.shape[1])
 
         kmeans = KMeans(
             n_clusters=self.number_of_groups,
@@ -41,7 +43,7 @@ class GeneticAlgorithm(RCGA):
             n_init=1,
         )
 
-        kmeans.fit(self.dataset)
+        kmeans.fit(self.dataset.data)
 
         refined = kmeans.cluster_centers_.flatten()
         self.Chrom[idx] = (refined - self.lb) / (self.ub - self.lb)
@@ -87,11 +89,11 @@ class GeneticAlgorithm(RCGA):
         return self.best_x, self.best_y
 
     def get_clusters(self) -> np.ndarray:
-        centroids = self.best_x.reshape(self.number_of_groups, self.dataset.shape[1])
-        distances = np.linalg.norm(self.dataset[:, np.newaxis, :] - centroids[np.newaxis, :, :], axis=2)
+        centroids = self.best_x.reshape(self.number_of_groups, self.dataset.data.shape[1])
+        distances = np.linalg.norm(self.dataset.data[:, np.newaxis, :] - centroids[np.newaxis, :, :], axis=2)
         return distances.argmin(axis=1)
 
-    def plot(self, filename: str, class_names: List[str]) -> None:
+    def plot(self, filename: str) -> None:
         labels = self.get_clusters()
         dataset_3d, centroids_3d = self.get_3d_points_for_plot()
 
@@ -100,7 +102,7 @@ class GeneticAlgorithm(RCGA):
 
         for i in range(self.number_of_groups):
             mask = labels == i
-            ax.scatter(dataset_3d[mask, 0], dataset_3d[mask, 1], dataset_3d[mask, 2], s=20, label=class_names[i].capitalize())
+            ax.scatter(dataset_3d[mask, 0], dataset_3d[mask, 1], dataset_3d[mask, 2], s=20, label=self.dataset.class_names[i].capitalize())
 
         ax.scatter(centroids_3d[:, 0], centroids_3d[:, 1], centroids_3d[:, 2], s=20, c='black', label='Centroids')
         ax.legend()
@@ -109,22 +111,22 @@ class GeneticAlgorithm(RCGA):
         plt.savefig(filename, format='png')
 
     def get_3d_points_for_plot(self) -> np.ndarray:
-        n_features = self.dataset.shape[1]
+        n_features = self.dataset.data.shape[1]
         centroids = self.best_x.reshape(self.number_of_groups, n_features)
 
         if n_features > 3:
             pca = PCA(n_components=3)
-            pca.fit(self.dataset)
-            dataset_3d = pca.transform(self.dataset)
+            pca.fit(self.dataset.data)
+            dataset_3d = pca.transform(self.dataset.data)
             centroids_3d = pca.transform(centroids)
         elif n_features == 3:
-            dataset_3d = self.dataset
+            dataset_3d = self.dataset.data
             centroids_3d = centroids
         elif n_features == 2:
-            dataset_3d = np.hstack([self.dataset, np.zeros((len(self.dataset), 1))])
+            dataset_3d = np.hstack([self.dataset.data, np.zeros((len(self.dataset.data), 1))])
             centroids_3d = np.hstack([centroids, np.zeros((self.number_of_groups, 1))])
         elif n_features == 1:
-            dataset_3d = np.hstack([self.dataset, np.zeros((len(self.dataset), 2))])
+            dataset_3d = np.hstack([self.dataset.data, np.zeros((len(self.dataset.data), 2))])
             centroids_3d = np.hstack([centroids, np.zeros((self.number_of_groups, 2))])
         else:
             raise ValueError("Dataset must have at least 1 feature")

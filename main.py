@@ -1,17 +1,26 @@
-from sklearn.datasets import load_iris
-from sklearn.utils import Bunch
+from typing import List
+from sklearn.datasets import load_iris, load_wine
+from src.dataset import Dataset
 from src.runner import Runner
+import pandas as pd
 
-iris_dataset: Bunch = load_iris()
+RUN_TIMES = 10
 
-runner = Runner(
-    dataset=iris_dataset.data,
-    number_of_groups=3,
-    filename='test.png',
-    class_names=iris_dataset.target_names,
-    run_times=10,
-)
+datasets: List[Dataset] = [
+    Dataset.from_bunch(load_iris(), 'iris'),
+    Dataset.from_bunch(load_wine(), 'wine'),
+]
 
-runner.run()
-runner.plot()
-print(runner.stats())
+dataframe_rows = []
+
+for dataset in datasets:
+    print(f'Running dataset: {dataset.name}')
+    runner = Runner(dataset, f'{dataset.name}.png', RUN_TIMES)
+
+    runner.run()
+    runner.plot()
+    dataframe_rows.append(runner.get_dataframe_row())
+
+dataframe = pd.DataFrame(dataframe_rows)
+
+print(dataframe)

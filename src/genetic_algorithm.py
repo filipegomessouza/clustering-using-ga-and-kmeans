@@ -51,9 +51,12 @@ class GeneticAlgorithm(RCGA):
         kmeans.fit(self.dataset.data)
 
         refined = kmeans.cluster_centers_.flatten()
-        self.Chrom[idx] = (refined - self.lb) / (self.ub - self.lb)
-        self.X[idx] = refined
-        self.Y[idx] = self.func(np.array([refined]))[0]
+        new_fitness = self.func(np.array([refined]))[0]
+
+        if new_fitness < self.Y[idx]:
+            self.Chrom[idx] = (refined - self.lb) / (self.ub - self.lb)
+            self.X[idx] = refined
+            self.Y[idx] = new_fitness
 
     def run(self, max_iter=None):
         self.max_iter = max_iter or self.max_iter

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Union
 from sklearn.datasets import load_iris, load_wine
 from src.dataset import Dataset
 from src.runner import Runner
@@ -11,11 +11,11 @@ datasets: List[Dataset] = [
     Dataset.from_bunch(load_wine(), 'wine'),
 ]
 
-dataframe_rows = []
+dataframe_rows: List[Dict[str, Union[str, float]]] = []
 
 for dataset in datasets:
-    print(f'Running dataset: {dataset.name}')
-    runner = Runner(dataset, f'{dataset.name}.png', RUN_TIMES)
+    print(f'Running GA on dataset {dataset.name}')
+    runner = Runner(dataset, f'clusters/{dataset.name}.png', RUN_TIMES)
 
     runner.run()
     runner.plot()

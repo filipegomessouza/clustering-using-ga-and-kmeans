@@ -8,6 +8,8 @@ from src.dataset import Dataset
 
 class GeneticAlgorithm(RCGA):
     MUTATION_PROBABILITY = 0.01
+    MUTATION_MEAN = 0
+    MUTATION_STD = 0.1
 
     def __init__(self, dataset: Dataset, number_of_groups: int):
         self.dataset = dataset
@@ -27,6 +29,9 @@ class GeneticAlgorithm(RCGA):
             ub=dataset.data.max(axis=0).tolist() * number_of_groups,
         )
 
+        self.register('mutation', type(self).gaussian_mutation)
+        self.register('crossover', type(self).arithmetic_crossover)
+
     def fitness(self, individual: np.ndarray) -> float:
         centroids = individual.reshape(self.number_of_groups, self.dataset.data.shape[1])
         distances: np.ndarray = np.linalg.norm(self.dataset.data[:, np.newaxis, :] - centroids[np.newaxis, :, :], axis=2)
@@ -34,7 +39,7 @@ class GeneticAlgorithm(RCGA):
 
         return min_distances.sum()
 
-    def _apply_kmeans(self, idx: int) -> None:
+    def apply_kmeans(self, idx: int) -> None:
         centroids = self.X[idx].reshape(self.number_of_groups, self.dataset.data.shape[1])
 
         kmeans = KMeans(
@@ -61,7 +66,7 @@ class GeneticAlgorithm(RCGA):
 
             if i < kmeans_limit:
                 idx = int(self.Y.argmin()) if i == 0 else np.random.randint(0, self.size_pop)
-                self._apply_kmeans(idx)
+                self.apply_kmeans(idx)
 
             self.ranking()
             self.selection()
@@ -92,6 +97,30 @@ class GeneticAlgorithm(RCGA):
         centroids = self.best_x.reshape(self.number_of_groups, self.dataset.data.shape[1])
         distances = np.linalg.norm(self.dataset.data[:, np.newaxis, :] - centroids[np.newaxis, :, :], axis=2)
         return distances.argmin(axis=1)
+
+    def gaussian_mutation(self):
+        for i in range(self.size_pop):
+            for j in range(self.n_dim):
+                if np.random.random() <= self.prob_mut:
+                    self.Chrom[i][j] += np.random.normal(self.MUTATION_MEAN, self.MUTATION_STD)
+                    self.Chrom[i][j] = np.clip(self.Chrom[i][j], 0, 1)
+
+        return self.Chrom
+
+    def arithmetic_crossover(self):
+        for i in range(0, self.size_pop, 2):
+            if np.random.random() > self.prob_cros:
+                continue
+
+            alpha = np.random.random()
+
+            child1 = alpha * self.Chrom[i] + (1 - alpha) * self.Chrom[i + 1]
+            child2 = alpha * self.Chrom[i + 1] + (1 - alpha) * self.Chrom[i]
+
+            self.Chrom[i] = np.clip(child1, 0, 1)
+            self.Chrom[i + 1] = np.clip(child2, 0, 1)
+
+        return self.Chrom
 
     def plot(self, filename: str) -> None:
         labels = self.get_clusters()
